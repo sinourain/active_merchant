@@ -56,6 +56,32 @@ module ActiveMerchant #:nodoc:
         commit('capture', post)
       end
 
+      def refund(amount, authorization, options = {})
+        post = {
+          request: {
+            MerchantId: @options[:merchant_id],
+            OrderId: authorization,
+            ReferenceId: options[:reference_id],
+            Amount: amount
+          }
+        }
+
+        commit('refund', post)
+      end
+
+      def void(authorization, options = {})
+        post = { request: { MerchantId: @options[:merchant_id], OrderId: authorization } }
+
+        commit('cancel', post)
+      end
+
+      def verify(credit_card, options = {})
+        MultiResponse.run(:use_first_response) do |r|
+          r.process { authorize(100, credit_card, options) }
+          r.process(:ignore_result) { void(r.authorization, options) }
+        end
+      end
+
       private
 
       def build_checkout_request(amount, payment, options)
