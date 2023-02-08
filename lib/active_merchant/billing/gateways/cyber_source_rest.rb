@@ -48,6 +48,19 @@ module ActiveMerchant #:nodoc:
         commit('/pts/v2/payments/', post)
       end
 
+      def void(authorization, options = {})
+        post = { request: { OrderId: authorization } }
+        commit("/pts/v2/payments/#{authorization}/voids", post)
+      end
+
+      def verify(credit_card, options = {})
+        amount = eligible_for_zero_auth?(credit_card, options) ? 0 : 100
+        MultiResponse.run(:use_first_response) do |r|
+          r.process { purchase(amount, credit_card, options) }
+          r.process(:ignore_result) { void(r.authorization, options) }
+        end
+      end
+
       def supports_scrubbing?
         true
       end
@@ -161,7 +174,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def success_from(response)
-        response['status'] == 'AUTHORIZED'
+        %w(AUTHORIZED VOIDED).include?(response['status'])
       end
 
       def message_from(response)

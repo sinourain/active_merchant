@@ -63,11 +63,42 @@ class RemoteCyberSourceRestTest < Test::Unit::TestCase
 
   def test_successful_purchase
     response = @gateway.purchase(@amount, @visa_card, @options)
-
     assert_success response
     assert response.test?
     assert_equal 'AUTHORIZED', response.message
     assert_nil response.params['_links']['capture']
+  end
+
+  def test_successful_void_a_payment
+    purchase = @gateway.purchase(@amount, @visa_card, @options)
+    response = @gateway.void(purchase.authorization, @options)
+    assert_success response
+    assert response.params['id'].present?
+    assert_equal 'VOIDED', response.message
+    assert_nil response.params['_links']['capture']
+  end
+
+  def test_failure_void
+    purchase = @gateway.purchase(@amount, @card_with_out_funds, @options)
+    response = @gateway.void(purchase.authorization, @options)
+    assert_failure response
+    assert_match %r{Decline - The request ID is invalid.}, response.params['message']
+    assert_equal 'INVALID_REQUEST', response.params['status']
+  end
+
+  def test_successful_verify
+    response = @gateway.verify(@visa_card, @options)
+    assert_success response
+    assert response.params['id'].present?
+    assert_equal 'AUTHORIZED', response.message
+    assert_nil response.params['_links']['capture']
+  end
+
+  def test_failure_verify
+    response = @gateway.verify(@card_with_out_funds, @options)
+    assert_failure response
+    assert_match %r{Decline - Invalid account number}, response.message
+    assert_equal 'INVALID_ACCOUNT', response.error_code
   end
 
   def test_transcript_scrubbing
